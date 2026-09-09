@@ -1,4 +1,8 @@
 <title>
-  <%= content_for(:html_title) || (signed_in? ? 'DocuSeal' : 'DocuSeal | Open Source Document Signing') %>
+  <%= content_for(:html_title) || (signed_in? ? '마트노조 전자서명' : '마트노조 전자서명') %>
 </title>
 <%= render 'shared/meta' %>
+
+<!-- 파비콘 및 앱 아이콘 단일 logo.svg로 통합 -->
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/logo.svg">
