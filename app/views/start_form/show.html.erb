@@ -1,16 +1,18 @@
-<% content_for(:html_title, "#{@template.name} | DocuSeal") %>
+<% content_for(:html_title, "#{@template.name} | 마트노조 전자서명") %>
 <% I18n.with_locale(@template.account.locale) do %>
   <% content_for(:html_description, t('account_name_has_invited_you_to_fill_and_sign_documents_online_effortlessly_with_a_secure_fast_and_user_friendly_digital_document_signing_solution', account_name: @template.account.name)) %>
 <% end %>
+
 <main class="max-w-md mx-auto px-2 mt-12 mb-4">
   <div class="space-y-6 mx-auto">
     <div class="space-y-6">
       <div class="text-center w-full space-y-6">
         <%= render 'start_form/banner' %>
         <% unless @template.archived_at? %>
-          <p class="text-xl font-semibold text-center"><%= t('you_have_been_invited_to_submit_a_form') %></p>
+          <p class="text-xl font-semibold text-center">서명을 시작할 방식을 선택해 주세요</p>
         <% end %>
       </div>
+
       <div class="flex items-center bg-base-200 rounded-xl p-4 mb-4">
         <div class="flex items-center">
           <div class="mr-3">
@@ -27,43 +29,98 @@
         </div>
       </div>
     </div>
+
     <% if !@template.archived_at? && !@template.account.archived_at? %>
-      <%= form_for @submitter, url: @resubmit_submitter ? resubmit_form_path : start_form_path(@template.slug), data: { turbo_frame: :_top }, method: :put, html: { class: 'space-y-4' } do |f| %>
+      <!-- 탭 선택 헤더 -->
+      <div class="flex border-b border-gray-200 mb-4 bg-base-200 p-1 rounded-lg">
+        <button type="button" id="tab-phone-btn" onclick="switchAuthTab('phone')" class="flex-1 py-2 text-center font-medium text-sm rounded-md bg-white shadow text-primary">
+          이름 + 연락처
+        </button>
+        <button type="button" id="tab-email-btn" onclick="switchAuthTab('email')" class="flex-1 py-2 text-center font-medium text-sm rounded-md text-gray-500 hover:text-gray-700">
+          이메일
+        </button>
+      </div>
+
+      <%= form_for @submitter, url: @resubmit_submitter ? resubmit_form_path : start_form_path(@template.slug), data: { turbo_frame: :_top }, method: :put, html: { class: 'space-y-4', id: 'start-signature-form' } do |f| %>
         <%= hidden_field_tag :resubmit, @resubmit_submitter.slug if @resubmit_submitter %>
+        
         <% if @error_message %>
           <div class="alert items-start bg-base-100 border border-red-400 text-red-400">
             <%= svg_icon('info_circle', class: 'stroke-current shrink-0 h-6 w-6 mt-1') %>
             <div class="text-sm"><%= @error_message %></div>
           </div>
         <% end %>
-        <% link_form_fields = @template.preferences.fetch('link_form_fields', ['email']) %>
-        <% multiple_fields = link_form_fields.size > 1 %>
-        <% if link_form_fields.include?('name') %>
-          <div dir="auto" class="form-control !mt-0">
-            <%= f.label :name, t('name'), class: 'label' %>
-            <%= f.text_field :name, value: current_user&.full_name || params[:name] || @submitter.name, required: true, class: 'base-input', placeholder: t(multiple_fields ? 'provide_your_name' : 'provide_your_name_to_start') %>
-          </div>
-        <% end %>
-        <% if link_form_fields.include?('email') %>
-          <div dir="auto" class="form-control !mt-0">
-            <%= f.label :email, t('email'), class: 'label' %>
-            <%= f.email_field :email, value: current_user&.email || params[:email] || @submitter.email, required: true, class: 'base-input', placeholder: t(multiple_fields ? 'provide_your_email' : 'provide_your_email_to_start') %>
-          </div>
-        <% end %>
-        <% if link_form_fields.include?('phone') %>
-          <div dir="auto" class="form-control !mt-0">
-            <%= f.label :phone, t('phone'), class: 'label' %>
-            <%= f.telephone_field :phone, value: params[:phone] || @submitter.phone, pattern: '^\+[0-9\s\-]+$', required: true, title: t('use_international_format_1xxx_'), class: 'base-input w-full', placeholder: t(multiple_fields ? 'provide_your_phone_in_international_format' : 'provide_your_phone_in_international_format_to_start') %>
-          </div>
-        <% end %>
-        <toggle-submit dir="auto" class="form-control">
-          <%= f.button button_title(title: t('start'), disabled_with: t('starting')), class: 'base-button' %>
+
+        <!-- [공통/탭1 영역] 이름 입력 필드 -->
+        <div dir="auto" class="form-control !mt-0" id="field-group-name">
+          <%= f.label :name, "이름", class: 'label font-semibold' %>
+          <%= f.text_field :name, value: current_user&.full_name || params[:name] || @submitter.name, id: 'input-name', required: true, class: 'base-input', placeholder: '이름을 입력하세요' %>
+        </div>
+
+        <!-- [탭1 영역] 연락처 입력 필드 (기본 노출) -->
+        <div dir="auto" class="form-control !mt-3" id="field-group-phone">
+          <%= f.label :phone, "연락처(전화번호)", class: 'label font-semibold' %>
+          <%= f.telephone_field :phone, value: params[:phone] || @submitter.phone, id: 'input-phone', required: true, class: 'base-input w-full', placeholder: '010-1234-5678' %>
+        </div>
+
+        <!-- [탭2 영역] 이메일 입력 필드 (기본 숨김) -->
+        <div dir="auto" class="form-control !mt-3 hidden" id="field-group-email">
+          <%= f.label :email, "이메일 주소", class: 'label font-semibold' %>
+          <%= f.email_field :email, value: current_user&.email || params[:email] || @submitter.email, id: 'input-email', class: 'base-input', placeholder: 'example@email.com' %>
+        </div>
+
+        <toggle-submit dir="auto" class="form-control pt-2">
+          <%= f.button button_title(title: t('start'), disabled_with: t('starting')), class: 'base-button w-full' %>
         </toggle-submit>
       <% end %>
     <% end %>
   </div>
+
   <div class="mt-4">
     <%= render 'shared/attribution', link_path: '/start', account: @template.account %>
     <%= render 'start_form/policy', account: @template.account %>
   </div>
 </main>
+
+<script>
+  function switchAuthTab(type) {
+    const phoneBtn = document.getElementById('tab-phone-btn');
+    const emailBtn = document.getElementById('tab-email-btn');
+    const phoneGroup = document.getElementById('field-group-phone');
+    const emailGroup = document.getElementById('field-group-email');
+    
+    const inputName = document.getElementById('input-name');
+    const inputPhone = document.getElementById('input-phone');
+    const inputEmail = document.getElementById('input-email');
+
+    if (type === 'phone') {
+      // 버튼 스타일 적용
+      phoneBtn.className = 'flex-1 py-2 text-center font-medium text-sm rounded-md bg-white shadow text-primary';
+      emailBtn.className = 'flex-1 py-2 text-center font-medium text-sm rounded-md text-gray-500 hover:text-gray-700';
+      
+      // 필드 표시/숨김
+      phoneGroup.classList.remove('hidden');
+      emailGroup.classList.add('hidden');
+
+      // 필수 검증(required) 제어 및 값 초기화
+      inputName.required = true;
+      inputPhone.required = true;
+      inputEmail.required = false;
+      inputEmail.value = ''; // 이메일 값 비움
+    } else if (type === 'email') {
+      // 버튼 스타일 적용
+      emailBtn.className = 'flex-1 py-2 text-center font-medium text-sm rounded-md bg-white shadow text-primary';
+      phoneBtn.className = 'flex-1 py-2 text-center font-medium text-sm rounded-md text-gray-500 hover:text-gray-700';
+
+      // 필드 표시/숨김
+      emailGroup.classList.remove('hidden');
+      phoneGroup.classList.add('hidden');
+
+      // 필수 검증(required) 제어 및 값 초기화
+      inputEmail.required = true;
+      inputName.required = false; // 이메일 탭 진입 시 이름은 선택사항
+      inputPhone.required = false;
+      inputPhone.value = ''; // 전화번호 값 비움
+    }
+  }
+</script>
